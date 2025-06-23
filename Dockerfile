@@ -16,31 +16,18 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM node:22-alpine
 
-# Remove default nginx files
-RUN rm -rf /usr/share/nginx/html/*
+WORKDIR /app
 
-# Copy built app from the correct location (browser folder)
-COPY --from=build /app/dist/pwa-app/browser /usr/share/nginx/html/
+# Install serve package globally
+RUN npm install -g serve
 
-# Create nginx config for Angular SPA
-RUN echo 'server { \
-    listen 80; \
-    server_name localhost; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-    \
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ { \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Copy built app from build stage
+COPY --from=build /app/dist/pwa-app/browser ./dist
 
-EXPOSE 80
+# Expose port
+EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+# Serve the app
+CMD ["serve", "-s", "dist", "-l", "3000"]
