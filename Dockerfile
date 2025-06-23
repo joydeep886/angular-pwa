@@ -1,32 +1,46 @@
 # Build stage
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build the Angular app
-RUN npm run build --prod
+RUN npm run build
 
 # Production stage
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY default.conf /etc/nginx/conf.d/default.conf
+# Remove default nginx files
+RUN rm -rf /usr/share/nginx/html/*
 
-# Copy built app from build stage
-COPY --from=build /app/dist/pwa-app/browser /usr/share/nginx/html
+# Copy built app from the correct location (browser folder)
+COPY --from=build /app/dist/pwa-app/browser /usr/share/nginx/html/
 
-# Expose port
+# Create nginx config for Angular SPA
+RUN echo 'server { \
+    listen 80; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+    \
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ { \
+        expires 1y; \
+        add_header Cache-Control "public, immutable"; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 
-# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
